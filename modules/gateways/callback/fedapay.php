@@ -21,6 +21,7 @@
 require_once __DIR__ . '/../../../init.php';
 require_once __DIR__ . '/../../../includes/gatewayfunctions.php';
 require_once __DIR__ . '/../../../includes/invoicefunctions.php';
+require_once __DIR__ . '/../fedapay-php/functions.php';
 
 // Detect module name from filename.
 $gatewayModuleName = basename(__FILE__, '.php');
@@ -30,32 +31,24 @@ $gatewayParams = getGatewayVariables($gatewayModuleName);
 
 // Die if module is not active.
 if (!$gatewayParams['type']) {
-    die("Module Not Activated");
+    die('Module Not Activated');
 }
 
 // Retrieve data returned in payment gateway callback
 // Varies per payment gateway
-$success = $_POST["x_status"];
-$invoiceId = $_POST["x_invoice_id"];
-$transactionId = $_POST["x_trans_id"];
-$paymentAmount = $_POST["x_amount"];
-$paymentFee = $_POST["x_fee"];
-$hash = $_POST["x_hash"];
+$invoiceId = $_GET['invoice_id'];
+$transactionId = $_GET['id'];
+$returnUrl = $_GET['return_url'];
 
-$transactionStatus = $success ? 'Success' : 'Failure';
-
-/**
- * Validate callback authenticity.
- *
- * Most payment gateways provide a method of verifying that a callback
- * originated from them. In the case of our example here, this is achieved by
- * way of a shared secret which is used to build and compare a hash.
- */
-$secretKey = $gatewayParams['secretKey'];
-if ($hash != md5($invoiceId . $transactionId . $paymentAmount . $secretKey)) {
-    $transactionStatus = 'Hash Verification Failure';
-    $success = false;
+setup_fedapay_gateway($gatewayParams);
+try {
+    $transaction = retrieve_fedapay_transaction($transactionId);
+} catch(\Exception $e) {
+    die(display_fedapay_errors($e));
 }
+
+$success = ($transaction->status === 'approved');
+$transactionStatus = $success ? 'Success' : 'Failure';
 
 /**
  * Validate Callback Invoice ID.
@@ -82,7 +75,7 @@ $invoiceId = checkCbInvoiceID($invoiceId, $gatewayParams['name']);
  *
  * @param string $transactionId Unique Transaction ID
  */
-checkCbTransID($transactionId);
+checkCbTransID($transaction->id);
 
 /**
  * Log Transaction.
@@ -96,7 +89,7 @@ checkCbTransID($transactionId);
  * @param string|array $debugData    Data to log
  * @param string $transactionStatus  Status
  */
-logTransaction($gatewayParams['name'], $_POST, $transactionStatus);
+logTransaction($gatewayParams['name'], $_GET, $transactionStatus);
 
 if ($success) {
 
@@ -113,10 +106,12 @@ if ($success) {
      */
     addInvoicePayment(
         $invoiceId,
-        $transactionId,
-        $paymentAmount,
-        $paymentFee,
+        $transaction->id,
+        null,
+        null,
         $gatewayModuleName
     );
-
 }
+
+header('Location: '. transaction_return_url($returnUrl, $success));
+exit;
