@@ -111,19 +111,51 @@ if (!function_exists('fedapay_link')) {
      */
     function fedapay_link($params)
     {
-        setup_fedapay_gateway($params);
-
-        try {
-            $url = create_fedapay_transaction($params);
-        } catch (\Exception $e) {
-            return display_fedapay_errors($e);
-        }
+        // Invoice Parameters
+        $invoiceId = $params['invoiceid'];
+        $description = $params["description"];
+        $amount = $params['amount'];
+        $currency = $params['currency'];
+        // Client Parameters
+        $firstname = $params['clientdetails']['firstname'];
+        $lastname = $params['clientdetails']['lastname'];
+        $email = $params['clientdetails']['email'];
+        $country = $params['clientdetails']['country'];
+        $phone = $params['clientdetails']['phonenumber'];
 
         // System Parameters
+        $companyName = $params['companyname'];
+        $systemUrl = $params['systemurl'];
+        $returnUrl = $params['returnurl'];
         $langPayNow = $params['langpaynow'];
+        $moduleName = $params['paymentmethod'];
 
-        $htmlOutput = '<form method="get" action="' . $url . '">';
-        $htmlOutput .= '<input class="btn btn-success btn-sm" type="submit" value="' . $langPayNow . '" />';
+        $postfields = array();
+        $postfields['invoice_id'] = $invoiceId;
+        $postfields['description'] = $description;
+        $postfields['amount'] = $amount;
+        $postfields['currency'] = $currency;
+        $postfields['firstname'] = $firstname;
+        $postfields['lastname'] = $lastname;
+        $postfields['email'] = $email;
+        $postfields['country'] = $country;
+        $postfields['phone'] = $phone;
+        $postfields['return_url'] = $returnUrl;
+        $postfields['system_url'] = $systemUrl;
+        $postfields['payment_method'] = $moduleName;
+        $postfields['token'] = generateCSRFToken();
+
+        $postfields = encodeParams($postfields);
+
+        $url = $systemUrl . '/modules/gateways/fedapay-php/process.php';
+
+        $htmlOutput = '<form method="post" action="' . $url . '">';
+
+        foreach ($postfields as $k => $v) {
+            $htmlOutput .= '<input type="hidden" name="' . $k . '" value="' . $v . '" />';
+        }
+
+        $htmlOutput .= '<input type="submit" value="' . $langPayNow . '" />';
         $htmlOutput .= '</form>';
 
         return $htmlOutput;

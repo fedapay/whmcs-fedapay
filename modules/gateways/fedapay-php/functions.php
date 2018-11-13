@@ -3,6 +3,79 @@
 require_once __DIR__ . '/init.php';
 
 /**
+ * Generate a random string
+ * @param string $length
+ * @return string
+ */
+function randomString( $length = 20 ) {
+    $seed = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijqlmnopqrtsuvwxyz0123456789';
+    $max = strlen( $seed ) - 1;
+    $string = '';
+
+    for ( $i = 0; $i < $length; ++$i ) {
+        $string .= $seed{intval( mt_rand( 0.0, $max ) )};
+    }
+
+    return $string;
+}
+
+/**
+ * Generate CSRFToken
+ * @param string $key
+ * @return string
+ */
+function generateCSRFToken( $key ) {
+    // token generation (basically base64_encode any random complex string, time() is used for token expiration)
+    $token = base64_encode( time() . $extra . randomString( 32 ) );
+    // store the one-time token in session
+    $_SESSION[ 'feda_csrf_' . $key ] = $token;
+    return $token;
+}
+
+/**
+ * Verify CSRFToken
+ * @param string $key
+ * @param string $token
+ * @return bool
+ */
+function verifyCSRFToken($key, $token) {
+    // Get valid token from session
+    $hash = $_SESSION[ 'feda_csrf_' . $key ];
+    // Check if session token matches form token
+    if ( $token != $hash ) return false;
+
+    return true;
+}
+
+/**
+ * Encode params
+ * @param array $params
+ * @return array
+ */
+function encodeParams($params)
+{
+    foreach ($params as $k => $v) {
+        $params[$k] = urlencode($v);
+    }
+
+    return $params;
+}
+
+/**
+ * Decode params
+ * @param array $params
+ * @return array
+ */
+function decodeParams($params)
+{
+    foreach ($params as $k => $v) {
+        $params[$k] = urldecode($v);
+    }
+
+    return $params;
+}
+
+/**
  * Setup FedaPay Gateway
  */
 function setup_fedapay_gateway($params)
@@ -28,12 +101,12 @@ function setup_fedapay_gateway($params)
  */
 function transaction_callback_url($params)
 {
-    $systemUrl = $params['systemurl'];
-    $moduleName = $params['paymentmethod'];
-    $invoiceId = urlencode($params['invoiceid']);
-    $returnUrl = urlencode($params['returnurl']);
+    $systemUrl = $params['system_url'];
+    $moduleName = $params['payment_method'];
+    $invoiceId = $params['invoice_id'];
+    $returnUrl = urldecode($params['return_url']);
 
-    return $systemUrl . '/modules/gateways/callback/' . $moduleName . '.php'.
+    return $systemUrl . 'modules/gateways/callback/' . $moduleName . '.php'.
         '?invoice_id=' . $invoiceId . '&return_url=' . $returnUrl;
 }
 
@@ -69,9 +142,13 @@ function fedapay_transaction_params($params)
         'currency' => ['iso' => $params['currency']],
         'callback_url' => transaction_callback_url($params),
         'customer' => array(
-            'firstname' => $params['clientdetails']['firstname'],
-            'lastname' => $params['clientdetails']['lastname'],
-            'email' => $params['clientdetails']['email']
+            'firstname' => $params['firstname'],
+            'lastname' => $params['lastname'],
+            'email' => urldecode($params['email']),
+            'phone_number' => array(
+                'country' => $params['country'],
+                'number' => $params['phone']
+            )
         )
     );
 }
@@ -86,6 +163,8 @@ function create_fedapay_transaction($params)
     $transaction = \FedaPay\Transaction::create(
         fedapay_transaction_params($params)
     );
+
+    sleep(3); // For some reason, server failed. Wait 3s
 
     $token = $transaction->generateToken();
 
