@@ -143,7 +143,7 @@ if (!function_exists('fedapay_link')) {
         $postfields['return_url'] = $returnUrl;
         $postfields['system_url'] = $systemUrl;
         $postfields['payment_method'] = $moduleName;
-        $postfields['token'] = generateCSRFToken();
+        $postfields['token'] = generateCSRFToken('form');
 
         $postfields = encodeParams($postfields);
 
@@ -155,7 +155,7 @@ if (!function_exists('fedapay_link')) {
             $htmlOutput .= '<input type="hidden" name="' . $k . '" value="' . $v . '" />';
         }
 
-        $htmlOutput .= '<input type="submit" value="' . $langPayNow . '" />';
+        $htmlOutput .= '<input class="btn btn-sm btn-success" type="submit" value="' . $langPayNow . '" />';
         $htmlOutput .= '</form>';
 
         return $htmlOutput;

@@ -21,7 +21,7 @@ if (!$gatewayParams['type']) {
 // Varies per payment gateway
 $params = decodeParams($_POST);
 
-if (!verifyCSRFToken($params['token'])) {
+if (!verifyCSRFToken('form', $params['token'])) {
     die('CSRF Token not valid');
     exit;
 }
